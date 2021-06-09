@@ -65,7 +65,7 @@ def run(config):
   print('Experiment name is %s' % experiment_name)
 
   # Next, build the model
-  G = model.Generator(**config).to(device)
+  G = model.Generator(**config).to(device) # NOTE: important
   D = model.Discriminator(**config).to(device)
   
    # If using EMA, prepare it
@@ -87,7 +87,7 @@ def run(config):
     print('Casting D to fp16...')
     D = D.half()
     # Consider automatically reducing SN_eps?
-  GD = model.G_D(G, D)
+  GD = model.G_D(G, D) # NOTE: important
   print(G)
   print(D)
   print('Number of params in G: {} D: {}'.format(
@@ -140,17 +140,17 @@ def run(config):
   # Allow for different batch sizes in G
   G_batch_size = max(config['G_batch_size'], config['batch_size'])
   z_, y_ = utils.prepare_z_y(G_batch_size, G.dim_z, config['n_classes'],
-                             device=device, fp16=config['G_fp16'])
+                             device=device, fp16=config['G_fp16']) # NOTE: important
   # Prepare a fixed z & y to see individual sample evolution throghout training
   fixed_z, fixed_y = utils.prepare_z_y(G_batch_size, G.dim_z,
                                        config['n_classes'], device=device,
-                                       fp16=config['G_fp16'])  
-  fixed_z.sample_() # NOTE: one-time sample
-  fixed_y.sample_() # NOTE: one-time sample
+                                       fp16=config['G_fp16'])   # NOTE: important
+  fixed_z.sample_()
+  fixed_y.sample_()
   # Loaders are loaded, prepare the training function
   if config['which_train_fn'] == 'GAN':
     train = train_fns.GAN_training_function(G, D, GD, z_, y_, 
-                                            ema, state_dict, config)
+                                            ema, state_dict, config) # NOTE: important
   # Else, assume debugging and use the dummy train fn
   else:
     train = train_fns.dummy_training_function()
@@ -158,7 +158,7 @@ def run(config):
   sample = functools.partial(utils.sample,
                               G=(G_ema if config['ema'] and config['use_ema']
                                  else G),
-                              z_=z_, y_=y_, config=config) # NOTE: IMPORTANT: THIS FUNCTION PASSES y THRU THE EMBEDDING 
+                              z_=z_, y_=y_, config=config)
 
   print('Beginning training at epoch %d...' % state_dict['epoch'])
   # Train for specified number of epochs, although we mostly track G iterations.
@@ -181,7 +181,7 @@ def run(config):
         x, y = x.to(device).half(), y.to(device)
       else:
         x, y = x.to(device), y.to(device)
-      metrics = train(x, y)
+      metrics = train(x, y) # NOTE: important
       train_log.log(itr=int(state_dict['itr']), **metrics)
       
       # Every sv_log_interval, log singular values

@@ -66,10 +66,10 @@ def run(config):
   # Load weights
   print('Loading weights...')
   # Here is where we deal with the ema--load ema weights or load normal weights
-  utils.load_weights(G if not (config['use_ema']) else None, None, state_dict, 
-                     config['weights_root'], experiment_name, config['load_weights'],
-                     G if config['ema'] and config['use_ema'] else None,
-                     strict=False, load_optim=False)
+  # utils.load_weights(G if not (config['use_ema']) else None, None, state_dict, 
+  #                    config['weights_root'], experiment_name, config['load_weights'],
+  #                    G if config['ema'] and config['use_ema'] else None,
+  #                    strict=False, load_optim=False)
   # Update batch size setting used for G
   G_batch_size = max(config['G_batch_size'], config['batch_size']) 
   z_, y_ = utils.prepare_z_y(G_batch_size, G.dim_z, config['n_classes'],
@@ -117,26 +117,26 @@ def run(config):
                          experiment_name=experiment_name,
                          folder_number=config['sample_sheet_folder_num'],
                          z_=z_,)
-  # Sample interp sheets
-  if config['sample_interps']:
-    print('Preparing interp sheets...')
-    for fix_z, fix_y in zip([False, False, True], [False, True, False]):
-      utils.interp_sheet(G, num_per_sheet=16, num_midpoints=8,
-                         num_classes=config['n_classes'], 
-                         parallel=config['parallel'], 
-                         samples_root=config['samples_root'], 
-                         experiment_name=experiment_name,
-                         folder_number=config['sample_sheet_folder_num'], 
-                         sheet_number=0,
-                         fix_z=fix_z, fix_y=fix_y, device='cuda')
-  # Sample random sheet
-  if config['sample_random']:
-    print('Preparing random sample sheet...')
-    images, labels = sample()    
-    torchvision.utils.save_image(images.float(),
-                                 '%s/%s/random_samples.jpg' % (config['samples_root'], experiment_name),
-                                 nrow=int(G_batch_size**0.5),
-                                 normalize=True)
+  # # Sample interp sheets
+  # if config['sample_interps']:
+  #   print('Preparing interp sheets...')
+  #   for fix_z, fix_y in zip([False, False, True], [False, True, False]):
+  #     utils.interp_sheet(G, num_per_sheet=16, num_midpoints=8,
+  #                        num_classes=config['n_classes'], 
+  #                        parallel=config['parallel'], 
+  #                        samples_root=config['samples_root'], 
+  #                        experiment_name=experiment_name,
+  #                        folder_number=config['sample_sheet_folder_num'], 
+  #                        sheet_number=0,
+  #                        fix_z=fix_z, fix_y=fix_y, device='cuda')
+  # # Sample random sheet
+  # if config['sample_random']:
+  #   print('Preparing random sample sheet...')
+  #   images, labels = sample()    
+  #   torchvision.utils.save_image(images.float(),
+  #                                '%s/%s/random_samples.jpg' % (config['samples_root'], experiment_name),
+  #                                nrow=int(G_batch_size**0.5),
+  #                                normalize=True)
 
   # Get Inception Score and FID
   get_inception_metrics = inception_utils.prepare_inception_metrics(config['dataset'], config['parallel'], config['no_fid'])

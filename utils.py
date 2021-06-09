@@ -27,6 +27,13 @@ from torch.utils.data import DataLoader
 
 import datasets as dset
 
+from torchinfo import summary
+
+from torchviz import make_dot, make_dot_from_trace
+
+import sys
+sys.setrecursionlimit(1000000) # 10000 is an example, try with different values
+
 def prepare_parser():
   usage = 'Parser for all scripts.'
   parser = ArgumentParser(description=usage)
@@ -866,10 +873,19 @@ def sample(G, z_, y_, config):
   with torch.no_grad():
     z_.sample_()
     y_.sample_()
-    if config['parallel']:
-      G_z =  nn.parallel.data_parallel(G, (z_, G.shared(y_)))
-    else:
-      G_z = G(z_, G.shared(y_))
+    # if config['parallel']:
+    #   G_z =  nn.parallel.data_parallel(G, (z_, G.shared(y_)))
+    # else:
+    #   G_z = G(z_, G.shared(y_))   
+
+    print("In sample function, printing summary")
+
+    print("z_shape: ", z_.shape)
+    print("y_shape: ", G.shared(y_).shape)
+    summary(G, input_size=[(2, 120), (2,128)])
+
+    make_dot(G(z_, G.shared(y_)), params=dict(G.named_parameters())).render("attached", format="png")
+
     return G_z, y_
 
 
@@ -905,7 +921,48 @@ def sample_sheet(G, classes_per_sheet, num_classes, samples_per_class, parallel,
                                                  folder_number, i)
     torchvision.utils.save_image(out_ims, image_filename,
                                  nrow=samples_per_class, normalize=True)
+                                 
 
+# Sample function for sample sheets
+def sample_sheet_vis(G, classes_per_sheet, num_classes, samples_per_class, parallel,
+                 samples_root, experiment_name, folder_number, z_=None):
+  # Prepare sample directory
+  if not os.path.isdir('%s/%s' % (samples_root, experiment_name)):
+    os.mkdir('%s/%s' % (samples_root, experiment_name))
+  if not os.path.isdir('%s/%s/%d' % (samples_root, experiment_name, folder_number)):
+    os.mkdir('%s/%s/%d' % (samples_root, experiment_name, folder_number))
+  # loop over total number of sheets
+  for i in range(num_classes // classes_per_sheet):
+    ims = []
+    y = torch.arange(i * classes_per_sheet, (i + 1) * classes_per_sheet, device='cuda')
+    for j in range(samples_per_class):
+      if (z_ is not None) and hasattr(z_, 'sample_') and classes_per_sheet <= z_.size(0):
+        z_.sample_()
+      else:
+        z_ = torch.randn(classes_per_sheet, G.dim_z, device='cuda')  
+
+      with torch.no_grad():
+        # o = G(z_[:classes_per_sheet], G.shared(y))
+        print("z_shape: ", z_[:classes_per_sheet].shape)
+        print("y_shape: ", G.shared(y).shape)
+        summary(G, input_data=[z_[:classes_per_sheet], G.shared(y)])
+      break
+    break
+      # with torch.no_grad():
+      #   if parallel:
+      #     o = nn.parallel.data_parallel(G, (z_[:classes_per_sheet], G.shared(y)))
+      #   else:
+      #     o = G(z_[:classes_per_sheet], G.shared(y))
+
+    #   ims += [o.data.cpu()]
+    # # This line should properly unroll the images
+    # out_ims = torch.stack(ims, 1).view(-1, ims[0].shape[1], ims[0].shape[2], 
+    #                                    ims[0].shape[3]).data.float().cpu()
+    # # The path for the samples
+    # image_filename = '%s/%s/%d/samples%d.jpg' % (samples_root, experiment_name, 
+    #                                              folder_number, i)
+    # torchvision.utils.save_image(out_ims, image_filename,
+    #                              nrow=samples_per_class, normalize=True)
 
 # Interp function; expects x0 and x1 to be of shape (shape0, 1, rest_of_shape..)
 def interp(x0, x1, num_midpoints):

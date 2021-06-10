@@ -873,14 +873,82 @@ def sample(G, z_, y_, config):
     return G_z, y_
 
 
+def sample_conditional(G, num_classes, samples_per_class, parallel,
+                 samples_root, experiment_name, folder_number, G_batch_size, z_=None):
+  # Prepare sample directory
+  if not os.path.isdir('%s/%s' % (samples_root, experiment_name)):
+    os.makedirs('%s/%s' % (samples_root, experiment_name), exist_ok=True)
+  if not os.path.isdir('%s/%s/%d' % (samples_root, experiment_name, folder_number)):
+    os.makedirs('%s/%s/%d' % (samples_root, experiment_name, folder_number), exist_ok=True)
+
+  # loop over total number of sheets
+  batch_sizes = [G_batch_size]*int(samples_per_class/G_batch_size) + [samples_per_class%G_batch_size]
+  global_image_filenames = []
+  global_z_vectors = torch.tensor([], device=torch.device("cuda"))
+  global_cls_vectors = torch.tensor([], device=torch.device("cuda"))
+
+  for i in range(num_classes):
+    print("Class: %d" % (i))
+    ims = []
+    z_vectors = torch.tensor([], device=torch.device("cuda"))
+    cls_vector = torch.tensor([i], device=torch.device("cuda")).repeat(samples_per_class)
+    for k, bs in enumerate(batch_sizes):
+      if bs == 0:
+        continue
+      y = cls_vector[:bs]
+      if (z_ is not None) and hasattr(z_, 'sample_'):
+        z_.sample_()     
+        z_vectors = torch.cat((z_vectors, z_))
+      with torch.no_grad():
+        if parallel:
+          o = nn.parallel.data_parallel(G, (z_[:bs], G.shared(y)))
+        else:
+          o = G(z_[:bs], G.shared(y))
+
+      ims += [o.data.cpu()]
+    
+    out_ims = torch.stack(ims, 1).view(-1, ims[0].shape[1], ims[0].shape[2], 
+                                       ims[0].shape[3]).data.float().cpu()
+    
+    for l,img in enumerate(out_ims):
+      
+      image_filename = '%s/%s/%d/samples/%d/images/%d.jpg' % (samples_root, experiment_name, 
+                                                  folder_number, i, l)
+
+      os.makedirs(os.path.split(image_filename)[0], exist_ok=True)
+
+      torchvision.utils.save_image(img, image_filename, normalize=True)
+
+      global_image_filenames += ['samples/%d/images/%d.jpg' % (i, l)]
+
+    global_z_vectors = torch.cat((global_z_vectors, z_vectors))
+    global_cls_vectors = torch.cat((global_cls_vectors, cls_vector))
+ 
+  # Finally
+
+  torch.save(global_z_vectors, '%s/%s/%d/z_vectors.pt' % (samples_root, experiment_name, 
+                                                  folder_number))
+  # torch.save(global_cls_vectors, '%s/%s/%d/classes.pt' % (samples_root, experiment_name, 
+  #                                                 folder_number))
+
+  textfile = open('%s/%s/%d/dataset.txt' % (samples_root, experiment_name, 
+                                                  folder_number), "w")
+  for i, element in enumerate(global_image_filenames):
+    textfile.write(element + " " + str(int(global_cls_vectors[i].data.item())) + "\n")
+  textfile.close()
+
+  return
+
+    
+
 # Sample function for sample sheets
 def sample_sheet(G, classes_per_sheet, num_classes, samples_per_class, parallel,
                  samples_root, experiment_name, folder_number, z_=None):
   # Prepare sample directory
   if not os.path.isdir('%s/%s' % (samples_root, experiment_name)):
-    os.mkdir('%s/%s' % (samples_root, experiment_name))
+    os.makedirs('%s/%s' % (samples_root, experiment_name), exist_ok=True)
   if not os.path.isdir('%s/%s/%d' % (samples_root, experiment_name, folder_number)):
-    os.mkdir('%s/%s/%d' % (samples_root, experiment_name, folder_number))
+    os.makedirs('%s/%s/%d' % (samples_root, experiment_name, folder_number), exist_ok=True)
   # loop over total number of sheets
   for i in range(num_classes // classes_per_sheet):
     ims = []
@@ -903,6 +971,9 @@ def sample_sheet(G, classes_per_sheet, num_classes, samples_per_class, parallel,
     # The path for the samples
     image_filename = '%s/%s/%d/samples%d.jpg' % (samples_root, experiment_name, 
                                                  folder_number, i)
+
+    os.makedirs(os.path.split(image_filename)[0], exist_ok=True)
+
     torchvision.utils.save_image(out_ims, image_filename,
                                  nrow=samples_per_class, normalize=True)
 

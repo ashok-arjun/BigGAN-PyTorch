@@ -1,0 +1,1 @@
+samples/BigGAN_I128_hdf5_seed0_Gch96_Dch96_bs256_nDa8_nGa8_Glr1.0e-04_Dlr4.0e-04_Gnlinplace_relu_Dnlinplace_relu_Ginitortho_Dinitortho_Gattn64_Dattn64_Gshared_hier_ema/-1/samples/0/images/0.jpg
